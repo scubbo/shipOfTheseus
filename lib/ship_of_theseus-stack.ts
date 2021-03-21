@@ -44,13 +44,15 @@ class ApplicationStack extends cdk.Stack {
     let distribution = new Distribution(this, 'Distribution', {
       defaultBehavior: { origin: new S3Origin(bucket)}
     })
-    let zoneName = this.node.tryGetContext('zoneDomainName');
-    if (zoneName === undefined) {
-      throw new Error("ZoneName is undefined");
+    let zoneId = this.node.tryGetContext('zoneId');
+    if (zoneId === undefined) {
+      throw new Error("ZoneId is undefined");
     }
-    const zone = HostedZone.fromLookup(this, 'baseZone', {
-        domainName: zoneName,
-      })
+    // TODO: When I tried doing lookup-by-domain-name, Cloudformation created another Host Zone with the _same name_?
+    const zone = HostedZone.fromHostedZoneId(this, 'baseZone', zoneId)
+    // const zone = HostedZone.fromLookup(this, 'baseZone', {
+    //     domainName: zoneName,
+    //   })
     new ARecord(this, 'ARecord', {
       zone,
       target: RecordTarget.fromAlias(new CloudFrontTarget(distribution)),
