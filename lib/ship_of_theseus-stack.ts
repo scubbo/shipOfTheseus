@@ -73,24 +73,11 @@ export class PipelineOfTheseus extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const paramOwner = new cdk.CfnParameter(this, 'paramOwner', {
-      type: 'String',
-      description: 'Owner of the source GitHub repo'
-    });
-    const paramRepo = new cdk.CfnParameter(this, 'paramRepo', {
-      type: 'String',
-      description: 'Name of the source GitHub repo'
-    })
     const paramOAuthToken = new cdk.CfnParameter(this, 'paramOAuthToken', {
       type: 'String',
       description: 'OAuth Token for GitHub interaction',
       noEcho: true
     })
-    const paramName = new cdk.CfnParameter(this, 'paramName', {
-      type: 'String',
-      description: 'The Name that this website will be accessible at (under Hosted Zone). The full address will be https://<name>.<zone>'
-    })
-
 
     // https://docs.aws.amazon.com/cdk/api/latest/docs/pipelines-readme.html
     const sourceArtifact = new Artifact();
@@ -105,8 +92,8 @@ export class PipelineOfTheseus extends cdk.Stack {
         output: sourceArtifact,
         branch: 'main',
         oauthToken: new cdk.SecretValue(paramOAuthToken.valueAsString),
-        owner: paramOwner.valueAsString,
-        repo: paramRepo.valueAsString,
+        owner: this.node.tryGetContext('owner'),
+        repo: this.node.tryGetContext('repo'),
       }),
 
       synthAction: SimpleSynthAction.standardNpmSynth({
@@ -115,8 +102,9 @@ export class PipelineOfTheseus extends cdk.Stack {
         // Necessary in order to connect to Docker, which itself is necessary for `PythonFunction`
         environment: {privileged: true},
         synthCommand: 'npx cdk synth ' +
-            '-c ghUrl=https://api.github.com/repos/' + paramOwner.valueAsString + '/' + paramRepo.valueAsString + ' ' +
-            '-c name=' + paramName.valueAsString
+            // Yes, you do have to pass these context variable down into the next context - I checked :P
+            '-c ghUrl=https://api.github.com/repos/' + this.node.tryGetContext('owner') + '/' + this.node.tryGetContext('repo') + ' ' +
+            '-c domainName=' + this.node.tryGetContext('domainName')
       }),
       // I don't know why, but, without this, I get `Cannot retrieve value from context provider hosted-zone since
       // account/region are not specified at the stack level.` even though they're set below...
