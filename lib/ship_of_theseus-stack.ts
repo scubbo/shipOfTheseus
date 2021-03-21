@@ -70,6 +70,7 @@ class ApplicationStack extends cdk.Stack {
     // perspective - but it's the principle of the thing)
     let distribution = new Distribution(this, 'Distribution', {
       defaultBehavior: { origin: new S3Origin(bucket)},
+      defaultRootObject: 'index.html',
       domainNames: [fullDomainName],
       certificate: certificate
     })
