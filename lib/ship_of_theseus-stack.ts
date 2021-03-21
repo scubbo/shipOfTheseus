@@ -1,4 +1,5 @@
 import * as cdk from '@aws-cdk/core';
+import { DnsValidatedCertificate } from '@aws-cdk/aws-certificatemanager';
 import { Distribution } from '@aws-cdk/aws-cloudfront';
 import { S3Origin } from '@aws-cdk/aws-cloudfront-origins';
 import { GitHubSourceAction } from '@aws-cdk/aws-codepipeline-actions';
@@ -33,17 +34,6 @@ class ApplicationStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: ApplicationStageProps) {
     super(scope, id, props);
 
-    const bucket = new Bucket(this, 'WebsiteBucket');
-    new BucketDeployment(this, "Deployment", {
-      sources: [Source.asset('static-site')],
-      destinationBucket: bucket,
-    });
-    // TODO: update Cache configuration so `commits.json` has lower cache rate
-    // to ensure it's updated faster (which is honestly pointless from a practical
-    // perspective - but it's the principle of the thing)
-    let distribution = new Distribution(this, 'Distribution', {
-      defaultBehavior: { origin: new S3Origin(bucket)}
-    })
     let zoneId = this.node.tryGetContext('zoneId');
     if (zoneId === undefined) {
       throw new Error("ZoneId is undefined");
@@ -52,12 +42,38 @@ class ApplicationStack extends cdk.Stack {
     if (zoneDomainName === undefined) {
       throw new Error("ZoneDomainName is undefined");
     }
+    let recordName = this.node.tryGetContext('recordName');
+    if (recordName === undefined) {
+      throw new Error('RecordName is undefined')
+    }
+    // I would have loved to do this as `domainNames: [aRecord.domainName]`, but
+    // boo hoo that would cause a circular dependency wah wah.
+    let fullDomainName = recordName + '.' + zoneDomainName
+
+    const bucket = new Bucket(this, 'WebsiteBucket');
+    new BucketDeployment(this, "Deployment", {
+      sources: [Source.asset('static-site')],
+      destinationBucket: bucket,
+    });
     // TODO: When I tried doing lookup-by-domain-name, Cloudformation created another Host Zone with the _same name_?
     // I got `fromAttributes` from [here](https://github.com/aws/aws-cdk/issues/3663)
     const zone = HostedZone.fromHostedZoneAttributes(this, 'baseZone', {
       zoneName: zoneDomainName,
       hostedZoneId: zoneId
     })
+    const certificate = new DnsValidatedCertificate(this, 'mySiteCert', {
+      domainName: fullDomainName,
+      hostedZone: zone,
+    });
+    // TODO: update Cache configuration so `commits.json` has lower cache rate
+    // to ensure it's updated faster (which is honestly pointless from a practical
+    // perspective - but it's the principle of the thing)
+    let distribution = new Distribution(this, 'Distribution', {
+      defaultBehavior: { origin: new S3Origin(bucket)},
+      domainNames: [fullDomainName],
+      certificate: certificate
+    })
+
     // const zone = HostedZone.fromHostedZoneId(this, 'baseZone', zoneId)
     // const zone = HostedZone.fromLookup(this, 'baseZone', {
     //     domainName: zoneName,
@@ -65,7 +81,7 @@ class ApplicationStack extends cdk.Stack {
     new ARecord(this, 'ARecord', {
       zone,
       target: RecordTarget.fromAlias(new CloudFrontTarget(distribution)),
-      recordName: this.node.tryGetContext('recordName')
+      recordName: recordName
     })
     //
     //
