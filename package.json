@@ -21,9 +21,11 @@
     "typescript": "~3.9.7"
   },
   "dependencies": {
+    "@aws-cdk/aws-cloudfront-origins": "1.89.0",
     "@aws-cdk/aws-codepipeline": "1.89.0",
     "@aws-cdk/aws-codepipeline-actions": "1.89.0",
     "@aws-cdk/aws-lambda-python": "1.89.0",
+    "@aws-cdk/aws_route53_targets": "1.89.0",
     "@aws-cdk/aws-s3-deployment": "1.89.0",
     "@aws-cdk/aws-secretsmanager": "1.89.0",
     "@aws-cdk/core": "1.89.0",

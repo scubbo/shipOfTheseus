@@ -10,7 +10,7 @@ I have created this project that is "_on Github and all it [...] publish[es is] 
 ## Prerequisites
 
 * You must have the [CDK CLI](https://aws.amazon.com/cdk/) installed.
-* You must have your own AWS Account, and own a Route53 domain on it.
+* You must have your own AWS Account, and own a Route53 Hosted Zone on it.
   * You must have local [AWS credentials](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) 
       that have admin privileges on that account. 
 * You must have your own GitHub account.
@@ -42,5 +42,7 @@ This should print `Environment aws://111111111111/us-east-1 bootstrapped.`
 $ cdk deploy --profile <admin-profile> \
     --parameters paramOwner=<your Github username> \
     --parameters paramRepo=<your Github repo name> \
-    --parameters paramOAuthToken=<your Github OAuth token, from earlier>
+    --parameters paramOAuthToken=<your Github OAuth token, from earlier> \
+    --parameters paramZoneDomainName=<hosted zone>
+    --parameters paramName=<name within hosted zone to deploy to>
 ```

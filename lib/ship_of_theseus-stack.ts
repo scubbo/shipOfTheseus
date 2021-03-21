@@ -1,9 +1,13 @@
 import * as cdk from '@aws-cdk/core';
-import { CdkPipeline, SimpleSynthAction } from '@aws-cdk/pipelines';
+import { Distribution } from '@aws-cdk/aws-cloudfront';
+import { S3Origin } from '@aws-cdk/aws-cloudfront-origins';
 import { GitHubSourceAction } from '@aws-cdk/aws-codepipeline-actions';
-import {CustomResource, Stage} from "@aws-cdk/core";
+import { CustomResource, Stage } from "@aws-cdk/core";
 import { Artifact } from "@aws-cdk/aws-codepipeline";
 import { PythonFunction } from "@aws-cdk/aws-lambda-python";
+import { CdkPipeline, SimpleSynthAction } from '@aws-cdk/pipelines';
+import { ARecord, HostedZone, RecordTarget } from '@aws-cdk/aws-route53';
+import { CloudFrontTarget } from '@aws-cdk/aws-route53-targets';
 import { Bucket } from "@aws-cdk/aws-s3";
 import { BucketDeployment, Source } from "@aws-cdk/aws-s3-deployment";
 
@@ -23,13 +27,26 @@ class ApplicationStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StageProps) {
     super(scope, id, props);
 
-    const bucket = new Bucket(this, 'WebsiteBucket', {
-      publicReadAccess: true
-    });
+    const bucket = new Bucket(this, 'WebsiteBucket');
     new BucketDeployment(this, "Deployment", {
       sources: [Source.asset('static-site')],
       destinationBucket: bucket,
     });
+    // TODO: update Cache configuration so `commits.json` has lower cache rate
+    // to ensure it's updated faster (which is honestly pointless from a practical
+    // perspective - but it's the principle of the thing)
+    let distribution = new Distribution(this, 'Distribution', {
+      defaultBehavior: { origin: new S3Origin(bucket)}
+    })
+    const zone = HostedZone.fromLookup(this, 'baseZone', {
+      domainName: this.node.tryGetContext('zoneDomainName')
+    })
+    new ARecord(this, 'ARecord', {
+      zone,
+      target: RecordTarget.fromAlias(new CloudFrontTarget(distribution))
+    })
+
+
     const lambda = new PythonFunction(this, 'FetchCommitHistoryFunction', {
       entry: 'lambda/',
       environment: {
@@ -60,6 +77,15 @@ export class PipelineOfTheseus extends cdk.Stack {
       type: 'String',
       description: 'OAuth Token for GitHub interaction'
     })
+    const paramZoneDomainName = new cdk.CfnParameter(this, 'paramZoneDomainName', {
+      type: 'String',
+      description: 'The Domain Name of the Hosted Zone that already exists in your account'
+    })
+    const paramName = new cdk.CfnParameter(this, 'paramName', {
+      type: 'String',
+      description: 'The Name that this website will be accessible at (under Hosted Zone). The full address will be https://<name>.<zone>'
+    })
+
 
     // https://docs.aws.amazon.com/cdk/api/latest/docs/pipelines-readme.html
     const sourceArtifact = new Artifact();
@@ -83,7 +109,10 @@ export class PipelineOfTheseus extends cdk.Stack {
         cloudAssemblyArtifact: cloudAssemblyArtifact,
         // Necessary in order to connect to Docker, which itself is necessary for `PythonFunction`
         environment: {privileged: true},
-        synthCommand: 'npx cdk synth -c ghUrl=https://api.github.com/repos/' + paramOwner.valueAsString + '/' + paramRepo.valueAsString
+        synthCommand: 'npx cdk synth ' +
+            '-c ghUrl=https://api.github.com/repos/' + paramOwner.valueAsString + '/' + paramRepo.valueAsString + ' ' +
+            '-c zoneDomainName=' + paramZoneDomainName.valueAsString + ' ' +
+            '-c name=' + paramName.valueAsString
       })
     })
 
