@@ -1,9 +1,42 @@
 import * as cdk from '@aws-cdk/core';
 import { CdkPipeline, SimpleSynthAction } from '@aws-cdk/pipelines';
-import { PipelineProject } from '@aws-cdk/aws-codebuild';
-import { CodeBuildAction, GitHubSourceAction } from '@aws-cdk/aws-codepipeline-actions';
-import { App } from "@aws-cdk/core";
-import {Artifact} from "@aws-cdk/aws-codepipeline";
+import { GitHubSourceAction } from '@aws-cdk/aws-codepipeline-actions';
+import {CustomResource, Stage} from "@aws-cdk/core";
+import { Artifact } from "@aws-cdk/aws-codepipeline";
+import { PythonFunction } from "@aws-cdk/aws-lambda-python";
+import { Bucket } from "@aws-cdk/aws-s3";
+import { BucketDeployment, Source } from "@aws-cdk/aws-s3-deployment";
+
+interface ApplicationStageProps extends cdk.StageProps {
+  githubCommitsUrl: string
+}
+
+class ApplicationStage extends Stage {
+
+  constructor(scope: cdk.Construct, id: string, props: ApplicationStageProps) {
+    super(scope, id, props);
+
+    const bucket = new Bucket(this, 'WebsiteBucket', {
+      publicReadAccess: true
+    });
+    new BucketDeployment(this, "Deployment", {
+      sources: [Source.asset('static-site')],
+      destinationBucket: bucket,
+    });
+    const lambda = new PythonFunction(this, 'FetchCommitHistoryFunction', {
+      entry: 'lambda/',
+      environment: {
+        bucketArn: bucket.bucketArn,
+        githubCommitsUrl: props.githubCommitsUrl
+      }
+    });
+    bucket.grantPut(lambda);
+    new CustomResource(this, 'FetchCommitsCustomResource', {
+      serviceToken: lambda.functionArn
+    });
+
+  }
+}
 
 export class ShipOfTheseusStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -25,7 +58,6 @@ export class ShipOfTheseusStack extends cdk.Stack {
     // https://docs.aws.amazon.com/cdk/api/latest/docs/pipelines-readme.html
     const sourceArtifact = new Artifact();
     const cloudAssemblyArtifact = new Artifact();
-    const codeBuildArtifact = new Artifact();
 
     const pipeline = new CdkPipeline(this, 'Pipeline', {
       pipelineName: 'PipelineOfTheseus',
@@ -42,27 +74,13 @@ export class ShipOfTheseusStack extends cdk.Stack {
 
       synthAction: SimpleSynthAction.standardNpmSynth({
         sourceArtifact: sourceArtifact,
-        cloudAssemblyArtifact: cloudAssemblyArtifact,
-        buildCommand: 'npm run build'
+        cloudAssemblyArtifact: cloudAssemblyArtifact
       })
     })
 
-    const project = new PipelineProject(this, 'ProjectOfTheseus');
-    const buildAction = new CodeBuildAction({
-      actionName: 'CodeBuild',
-      project,
-      input: sourceArtifact,
-      outputs: [codeBuildArtifact], // optional
-    });
-    pipeline.codePipeline.addStage({
-      stageName: 'CustomBuild',
-      actions: [buildAction]
-    });
+    pipeline.addApplicationStage(new ApplicationStage(this, 'prod-stage', {
+      githubCommitsUrl: 'https://api.github.com/repos/' + paramOwner.valueAsString + '/' + paramRepo.valueAsString
+    }))
 
   }
 }
-
-const app = new App();
-new ShipOfTheseusStack(app, 'PipelineStack', {
-  // No `env` definition, which I assume means it'll just use the defaults for the user doing the synthesizing?
-})
