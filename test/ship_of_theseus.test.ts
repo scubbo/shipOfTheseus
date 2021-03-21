@@ -5,7 +5,7 @@ import * as ShipOfTheseus from '../lib/ship_of_theseus-stack';
 test('Empty Stack', () => {
     const app = new cdk.App();
     // WHEN
-    const stack = new ShipOfTheseus.ShipOfTheseusStack(app, 'MyTestStack');
+    const stack = new ShipOfTheseus.PipelineOfTheseus(app, 'MyTestStack');
     // THEN
     expectCDK(stack).to(matchTemplate({
       "Resources": {}

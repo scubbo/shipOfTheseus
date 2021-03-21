@@ -16,6 +16,18 @@ class ApplicationStage extends Stage {
   constructor(scope: cdk.Construct, id: string, props: ApplicationStageProps) {
     super(scope, id, props);
 
+    // Immediately delegate to a stack because it's an error to create Buckets (and
+    // probably other resources) directly in a Stage.
+    new ApplicationStack(this, 'ApplicationStack', props);
+
+  }
+}
+
+interface ApplicationStackProps extends ApplicationStageProps {}
+class ApplicationStack extends cdk.Stack {
+  constructor(scope: cdk.Construct, id: string, props: ApplicationStackProps) {
+    super(scope, id, props);
+
     const bucket = new Bucket(this, 'WebsiteBucket', {
       publicReadAccess: true
     });
@@ -34,11 +46,10 @@ class ApplicationStage extends Stage {
     new CustomResource(this, 'FetchCommitsCustomResource', {
       serviceToken: lambda.functionArn
     });
-
   }
 }
 
-export class ShipOfTheseusStack extends cdk.Stack {
+export class PipelineOfTheseus extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
