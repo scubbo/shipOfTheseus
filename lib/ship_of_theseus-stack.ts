@@ -78,6 +78,22 @@ export class PipelineOfTheseus extends cdk.Stack {
       description: 'OAuth Token for GitHub interaction',
       noEcho: true
     })
+    const paramOwner = new cdk.CfnParameter(this, 'paramOwner', {
+      type: 'String',
+      description: 'Owner of the source GitHub repo'
+    });
+    const paramRepo = new cdk.CfnParameter(this, 'paramRepo', {
+      type: 'String',
+      description: 'Name of the source GitHub repo'
+    })
+    const paramZoneDomainName = new cdk.CfnParameter(this, 'paramZoneDomainName', {
+      type: 'String',
+      description: 'Domain Name of the Zone for the website'
+    })
+    const paramRecordName = new cdk.CfnParameter(this, 'paramRecordName', {
+      type: 'String',
+      description: 'The Name that this website will be accessible at (under Hosted Zone). The full address will be https://<name>.<zone>'
+    })
 
     // https://docs.aws.amazon.com/cdk/api/latest/docs/pipelines-readme.html
     const sourceArtifact = new Artifact();
@@ -92,8 +108,8 @@ export class PipelineOfTheseus extends cdk.Stack {
         output: sourceArtifact,
         branch: 'main',
         oauthToken: new cdk.SecretValue(paramOAuthToken.valueAsString),
-        owner: this.node.tryGetContext('owner'),
-        repo: this.node.tryGetContext('repo'),
+        owner: paramOwner.valueAsString,
+        repo: paramRepo.valueAsString
       }),
 
       synthAction: SimpleSynthAction.standardNpmSynth({
@@ -103,8 +119,9 @@ export class PipelineOfTheseus extends cdk.Stack {
         environment: {privileged: true},
         synthCommand: 'npx cdk synth ' +
             // Yes, you do have to pass these context variable down into the next context - I checked :P
-            '-c ghUrl=https://api.github.com/repos/' + this.node.tryGetContext('owner') + '/' + this.node.tryGetContext('repo') + ' ' +
-            '-c domainName=' + this.node.tryGetContext('domainName')
+            '-c ghUrl=https://api.github.com/repos/' + paramOwner.valueAsString + '/' + paramRepo.valueAsString + ' ' +
+            '-c domainName=' + paramZoneDomainName.valueAsString + ' ' +
+            '-c recordName=' + paramRecordName.valueAsString
       }),
       // I don't know why, but, without this, I get `Cannot retrieve value from context provider hosted-zone since
       // account/region are not specified at the stack level.` even though they're set below...
