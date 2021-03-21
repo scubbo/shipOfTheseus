@@ -75,28 +75,24 @@ class ApplicationStack extends cdk.Stack {
       certificate: certificate
     })
 
-    // const zone = HostedZone.fromHostedZoneId(this, 'baseZone', zoneId)
-    // const zone = HostedZone.fromLookup(this, 'baseZone', {
-    //     domainName: zoneName,
-    //   })
     new ARecord(this, 'ARecord', {
       zone,
       target: RecordTarget.fromAlias(new CloudFrontTarget(distribution)),
       recordName: recordName
     })
-    //
-    //
-    // const lambda = new PythonFunction(this, 'FetchCommitHistoryFunction', {
-    //   entry: 'lambda/',
-    //   environment: {
-    //     bucketArn: bucket.bucketArn,
-    //     githubCommitsUrl: this.node.tryGetContext('ghUrl')
-    //   }
-    // });
-    // bucket.grantPut(lambda);
-    // new CustomResource(this, 'FetchCommitsCustomResource', {
-    //   serviceToken: lambda.functionArn
-    // });
+
+    const lambda = new PythonFunction(this, 'FetchCommitHistoryFunction', {
+      entry: 'lambda/',
+      environment: {
+        bucketArn: bucket.bucketArn,
+        githubCommitsUrl: this.node.tryGetContext('ghUrl')
+      }
+    });
+    bucket.grantPut(lambda);
+    new CustomResource(this, 'FetchCommitsCustomResource', {
+      serviceToken: lambda.functionArn
+    });
+
   }
 }
 
