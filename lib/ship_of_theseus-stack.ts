@@ -18,7 +18,7 @@ class ApplicationStage extends Stage {
 
     // Immediately delegate to a stack because it's an error to create Buckets (and
     // probably other resources) directly in a Stage.
-    new ApplicationStack(this, 'ApplicationStack');
+    new ApplicationStack(this, 'ApplicationStack', props);
 
   }
 }
@@ -38,26 +38,34 @@ class ApplicationStack extends cdk.Stack {
     let distribution = new Distribution(this, 'Distribution', {
       defaultBehavior: { origin: new S3Origin(bucket)}
     })
-    const zone = HostedZone.fromLookup(this, 'baseZone', {
-      domainName: this.node.tryGetContext('zoneDomainName')
+    // const zone = HostedZone.fromLookup(this, 'baseZone', {
+    //   domainName: this.node.tryGetContext('zoneDomainName'),
+    // })
+    let zoneName = this.node.tryGetContext('domainName');
+    if (zoneName === undefined) {
+      throw new Error("ZoneName is undefined");
+    }
+    const zone = new HostedZone(this, 'HostedZone', {
+      zoneName: zoneName
     })
     new ARecord(this, 'ARecord', {
       zone,
-      target: RecordTarget.fromAlias(new CloudFrontTarget(distribution))
+      target: RecordTarget.fromAlias(new CloudFrontTarget(distribution)),
+      recordName: this.node.tryGetContext('recordName')
     })
-
-
-    const lambda = new PythonFunction(this, 'FetchCommitHistoryFunction', {
-      entry: 'lambda/',
-      environment: {
-        bucketArn: bucket.bucketArn,
-        githubCommitsUrl: this.node.tryGetContext('ghUrl')
-      }
-    });
-    bucket.grantPut(lambda);
-    new CustomResource(this, 'FetchCommitsCustomResource', {
-      serviceToken: lambda.functionArn
-    });
+    //
+    //
+    // const lambda = new PythonFunction(this, 'FetchCommitHistoryFunction', {
+    //   entry: 'lambda/',
+    //   environment: {
+    //     bucketArn: bucket.bucketArn,
+    //     githubCommitsUrl: this.node.tryGetContext('ghUrl')
+    //   }
+    // });
+    // bucket.grantPut(lambda);
+    // new CustomResource(this, 'FetchCommitsCustomResource', {
+    //   serviceToken: lambda.functionArn
+    // });
   }
 }
 
@@ -75,11 +83,8 @@ export class PipelineOfTheseus extends cdk.Stack {
     })
     const paramOAuthToken = new cdk.CfnParameter(this, 'paramOAuthToken', {
       type: 'String',
-      description: 'OAuth Token for GitHub interaction'
-    })
-    const paramZoneDomainName = new cdk.CfnParameter(this, 'paramZoneDomainName', {
-      type: 'String',
-      description: 'The Domain Name of the Hosted Zone that already exists in your account'
+      description: 'OAuth Token for GitHub interaction',
+      noEcho: true
     })
     const paramName = new cdk.CfnParameter(this, 'paramName', {
       type: 'String',
@@ -111,12 +116,19 @@ export class PipelineOfTheseus extends cdk.Stack {
         environment: {privileged: true},
         synthCommand: 'npx cdk synth ' +
             '-c ghUrl=https://api.github.com/repos/' + paramOwner.valueAsString + '/' + paramRepo.valueAsString + ' ' +
-            '-c zoneDomainName=' + paramZoneDomainName.valueAsString + ' ' +
             '-c name=' + paramName.valueAsString
-      })
+      }),
+      // I don't know why, but, without this, I get `Cannot retrieve value from context provider hosted-zone since
+      // account/region are not specified at the stack level.` even though they're set below...
+      crossAccountKeys: false
     })
 
-    pipeline.addApplicationStage(new ApplicationStage(this, 'prod-stage'))
+    pipeline.addApplicationStage(new ApplicationStage(this, 'prod-stage', {
+      env: {
+        account: process.env.CDK_DEFAULT_ACCOUNT,
+        region: process.env.CDK_DEFAULT_REGION
+      }
+    }))
 
   }
 }

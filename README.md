@@ -40,9 +40,9 @@ This should print `Environment aws://111111111111/us-east-1 bootstrapped.`
 * One-off deploy:
 ```
 $ cdk deploy --profile <admin-profile> \
-    --parameters paramOwner=<your Github username> \
-    --parameters paramRepo=<your Github repo name> \
     --parameters paramOAuthToken=<your Github OAuth token, from earlier> \
-    --parameters paramZoneDomainName=<hosted zone>
-    --parameters paramName=<name within hosted zone to deploy to>
+    -c owner=<your Github username> \
+    -c repo=<your Github repo name> \
+    -c zoneDomainName=<hosted zone>
+    -c recordName=<name within hosted zone to deploy to>
 ```
