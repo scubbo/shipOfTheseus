@@ -44,16 +44,13 @@ class ApplicationStack extends cdk.Stack {
     let distribution = new Distribution(this, 'Distribution', {
       defaultBehavior: { origin: new S3Origin(bucket)}
     })
-    // const zone = HostedZone.fromLookup(this, 'baseZone', {
-    //   domainName: this.node.tryGetContext('zoneDomainName'),
-    // })
     let zoneName = this.node.tryGetContext('zoneDomainName');
     if (zoneName === undefined) {
       throw new Error("ZoneName is undefined");
     }
-    const zone = new HostedZone(this, 'HostedZone', {
-      zoneName: zoneName
-    })
+    const zone = HostedZone.fromLookup(this, 'baseZone', {
+        domainName: zoneName,
+      })
     new ARecord(this, 'ARecord', {
       zone,
       target: RecordTarget.fromAlias(new CloudFrontTarget(distribution)),
