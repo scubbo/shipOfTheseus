@@ -1,14 +1,32 @@
-# Welcome to your CDK TypeScript project!
+# Welcome to the Project Of Theseus!
 
-This is a blank project for TypeScript development with CDK.
+Inspired by danhon@'s email on 2021-03-12 (not linked because a. I think he's currently
+migrating from Substack to Buttondown anyway, so the link would probably be dead soon,
+and b. updating this will give me a good opportunity to test the push-and-update functionality),
+I have created this project that is "_on Github and all it [...] publish[es is] its version history_".
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+# Installation
 
-## Useful commands
+## Prerequisites
 
- * `npm run build`   compile typescript to js
- * `npm run watch`   watch for changes and compile
- * `npm run test`    perform the jest unit tests
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk synth`       emits the synthesized CloudFormation template
+* You must have the [CDK CLI](https://aws.amazon.com/cdk/) installed.
+* You must have your own AWS Account, and own a Route53 domain on it.
+* You must have your own GitHub account.
+
+## Step-by-step
+
+* Fork this package to your own GithHub account.
+* Check it out locally:
+```
+$ git clone git@github.com:<yourUsername>/shipOfTheseus.git
+```
+* Bootstrap your AWS Account for CDK Pipeline deployments ([link](https://docs.aws.amazon.com/cdk/api/latest/docs/pipelines-readme.html#cdk-environment-bootstrapping))
+    (replace `111111111111` with your accountId):
+ ```
+$ npm install aws-cdk@latest
+$ env CDK_NEW_BOOTSTRAP=1 npx cdk bootstrap \
+    --profile admin-profile-1 \
+    --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess \
+    aws://111111111111/us-east-1
+```
+This should print `Environment aws://111111111111/us-east-1 bootstrapped.`
