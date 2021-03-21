@@ -7,25 +7,20 @@ import { PythonFunction } from "@aws-cdk/aws-lambda-python";
 import { Bucket } from "@aws-cdk/aws-s3";
 import { BucketDeployment, Source } from "@aws-cdk/aws-s3-deployment";
 
-interface ApplicationStageProps extends cdk.StageProps {
-  githubCommitsUrl: string
-}
-
 class ApplicationStage extends Stage {
 
-  constructor(scope: cdk.Construct, id: string, props: ApplicationStageProps) {
+  constructor(scope: cdk.Construct, id: string, props?: cdk.StageProps) {
     super(scope, id, props);
 
     // Immediately delegate to a stack because it's an error to create Buckets (and
     // probably other resources) directly in a Stage.
-    new ApplicationStack(this, 'ApplicationStack', props);
+    new ApplicationStack(this, 'ApplicationStack');
 
   }
 }
 
-interface ApplicationStackProps extends ApplicationStageProps {}
 class ApplicationStack extends cdk.Stack {
-  constructor(scope: cdk.Construct, id: string, props: ApplicationStackProps) {
+  constructor(scope: cdk.Construct, id: string, props?: cdk.StageProps) {
     super(scope, id, props);
 
     const bucket = new Bucket(this, 'WebsiteBucket', {
@@ -39,7 +34,7 @@ class ApplicationStack extends cdk.Stack {
       entry: 'lambda/',
       environment: {
         bucketArn: bucket.bucketArn,
-        githubCommitsUrl: props.githubCommitsUrl
+        githubCommitsUrl: this.node.tryGetContext('ghUrl')
       }
     });
     bucket.grantPut(lambda);
@@ -85,13 +80,14 @@ export class PipelineOfTheseus extends cdk.Stack {
 
       synthAction: SimpleSynthAction.standardNpmSynth({
         sourceArtifact: sourceArtifact,
-        cloudAssemblyArtifact: cloudAssemblyArtifact
+        cloudAssemblyArtifact: cloudAssemblyArtifact,
+        // Necessary in order to connect to Docker, which itself is necessary for `PythonFunction`
+        environment: {privileged: true},
+        synthCommand: 'npx cdk synth -c ghUrl=https://api.github.com/repos/' + paramOwner.valueAsString + '/' + paramRepo.valueAsString
       })
     })
 
-    pipeline.addApplicationStage(new ApplicationStage(this, 'prod-stage', {
-      githubCommitsUrl: 'https://api.github.com/repos/' + paramOwner.valueAsString + '/' + paramRepo.valueAsString
-    }))
+    pipeline.addApplicationStage(new ApplicationStage(this, 'prod-stage'))
 
   }
 }
