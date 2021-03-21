@@ -42,5 +42,6 @@ This should print `Environment aws://111111111111/us-east-1 bootstrapped.`
 * One-off deploy:
 ```
 $ cdk deploy --profile <admin-profile> \
-    --parameters paramOAuthToken=<your Github OAuth token, from earlier>
+    --parameters paramOAuthToken=<your Github OAuth token, from earlier> \
+    PipelineOfTheseus
 ```

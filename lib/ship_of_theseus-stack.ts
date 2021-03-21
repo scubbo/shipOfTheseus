@@ -2,7 +2,7 @@ import * as cdk from '@aws-cdk/core';
 import { Distribution } from '@aws-cdk/aws-cloudfront';
 import { S3Origin } from '@aws-cdk/aws-cloudfront-origins';
 import { GitHubSourceAction } from '@aws-cdk/aws-codepipeline-actions';
-import { CustomResource, Stage } from "@aws-cdk/core";
+import {CfnParameter, CustomResource, Stage} from "@aws-cdk/core";
 import { Artifact } from "@aws-cdk/aws-codepipeline";
 import { PythonFunction } from "@aws-cdk/aws-lambda-python";
 import { CdkPipeline, SimpleSynthAction } from '@aws-cdk/pipelines';
@@ -76,7 +76,7 @@ class ApplicationStack extends cdk.Stack {
 }
 
 interface InnerPipelineStackProps extends cdk.StackProps {
-  // oauthToken: string,
+  paramOAuthToken: CfnParameter,
   // owner: string,
   // repo: string,
   // zoneDomainName: string,
@@ -91,10 +91,10 @@ class InnerPipelineStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: InnerPipelineStackProps) {
     super(scope, id, props);
 
-    const paramOAuthToken = new cdk.CfnParameter(this, 'paramOAuthToken', {
-        type: 'String',
-        description: 'OAuth Token for GitHub interaction',
-        noEcho: true
+    // We don't actually use this param, but when doing `cdk deploy --parameters <...> --all`, all stacks need to be able to accept all parameters - and we can't just deploy once at once. So all Stacks need to have the same named param
+    new CfnParameter(this, 'paramOAuthToken', {
+      description: 'Fake param. See comment.',
+      noEcho: true
     })
 
     // https://docs.aws.amazon.com/cdk/api/latest/docs/pipelines-readme.html
@@ -109,7 +109,7 @@ class InnerPipelineStack extends cdk.Stack {
         actionName: 'GitHub',
         output: sourceArtifact,
         branch: 'main',
-        oauthToken: new cdk.SecretValue(paramOAuthToken.valueAsString),
+        oauthToken: new cdk.SecretValue(props.paramOAuthToken.valueAsString),
         owner: this.node.tryGetContext('owner'),
         repo: this.node.tryGetContext('repo')
       }),
@@ -151,15 +151,18 @@ export class PipelineOfTheseus extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: cdk.StackProps) {
     super(scope, id, props);
 
-    let recordName = this.node.tryGetContext('recordName')
-    if (recordName === undefined) {
-      throw new Error('RecordName is blank')
-    }
+    const paramOAuthToken = new cdk.CfnParameter(this, 'paramOAuthToken', {
+      type: 'String',
+      description: 'OAuth Token for GitHub interaction',
+      noEcho: true
+    })
+
     let innerPipelineStack = new InnerPipelineStack(this, 'InnerPipelineStack', {
       env: {
         account: process.env.CDK_DEFAULT_ACCOUNT,
         region: process.env.CDK_DEFAULT_REGION
-      }
+      },
+      paramOAuthToken: paramOAuthToken
       // recordName: recordName,
       // zoneDomainName: this.node.tryGetContext('zoneDomainName'),
       // repo: this.node.tryGetContext('repo'),
