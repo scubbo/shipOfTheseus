@@ -48,8 +48,17 @@ class ApplicationStack extends cdk.Stack {
     if (zoneId === undefined) {
       throw new Error("ZoneId is undefined");
     }
+    let zoneDomainName = this.node.tryGetContext('zoneDomainName');
+    if (zoneDomainName === undefined) {
+      throw new Error("ZoneDomainName is undefined");
+    }
     // TODO: When I tried doing lookup-by-domain-name, Cloudformation created another Host Zone with the _same name_?
-    const zone = HostedZone.fromHostedZoneId(this, 'baseZone', zoneId)
+    // I got `fromAttributes` from [here](https://github.com/aws/aws-cdk/issues/3663)
+    const zone = HostedZone.fromHostedZoneAttributes(this, 'baseZone', {
+      zoneName: zoneDomainName,
+      hostedZoneId: zoneId
+    })
+    // const zone = HostedZone.fromHostedZoneId(this, 'baseZone', zoneId)
     // const zone = HostedZone.fromLookup(this, 'baseZone', {
     //     domainName: zoneName,
     //   })
