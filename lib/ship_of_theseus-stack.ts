@@ -11,9 +11,14 @@ import { CloudFrontTarget } from '@aws-cdk/aws-route53-targets';
 import { Bucket } from "@aws-cdk/aws-s3";
 import { BucketDeployment, Source } from "@aws-cdk/aws-s3-deployment";
 
+
+interface ApplicationStageProps extends cdk.StageProps {
+  // recordName: string,
+  // zoneDomainName: string
+}
 class ApplicationStage extends Stage {
 
-  constructor(scope: cdk.Construct, id: string, props?: cdk.StageProps) {
+  constructor(scope: cdk.Construct, id: string, props: ApplicationStageProps) {
     super(scope, id, props);
 
     // Immediately delegate to a stack because it's an error to create Buckets (and
@@ -23,8 +28,9 @@ class ApplicationStage extends Stage {
   }
 }
 
+interface ApplicationStackProps extends ApplicationStageProps {}
 class ApplicationStack extends cdk.Stack {
-  constructor(scope: cdk.Construct, id: string, props?: cdk.StageProps) {
+  constructor(scope: cdk.Construct, id: string, props: ApplicationStageProps) {
     super(scope, id, props);
 
     const bucket = new Bucket(this, 'WebsiteBucket');
@@ -41,7 +47,7 @@ class ApplicationStack extends cdk.Stack {
     // const zone = HostedZone.fromLookup(this, 'baseZone', {
     //   domainName: this.node.tryGetContext('zoneDomainName'),
     // })
-    let zoneName = this.node.tryGetContext('domainName');
+    let zoneName = this.node.tryGetContext('zoneDomainName');
     if (zoneName === undefined) {
       throw new Error("ZoneName is undefined");
     }
@@ -69,37 +75,33 @@ class ApplicationStack extends cdk.Stack {
   }
 }
 
-export class PipelineOfTheseus extends cdk.Stack {
-  constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
+interface InnerPipelineStackProps extends cdk.StackProps {
+  // oauthToken: string,
+  // owner: string,
+  // repo: string,
+  // zoneDomainName: string,
+  // recordName: string
+}
+// Inner Stack to allow Parameters to be used in the pipeline and in the ApplicationStack
+// without causing dependency issues
+class InnerPipelineStack extends cdk.Stack {
+
+  readonly pipeline: CdkPipeline
+
+  constructor(scope: cdk.Construct, id: string, props: InnerPipelineStackProps) {
     super(scope, id, props);
 
     const paramOAuthToken = new cdk.CfnParameter(this, 'paramOAuthToken', {
-      type: 'String',
-      description: 'OAuth Token for GitHub interaction',
-      noEcho: true
-    })
-    const paramOwner = new cdk.CfnParameter(this, 'paramOwner', {
-      type: 'String',
-      description: 'Owner of the source GitHub repo'
-    });
-    const paramRepo = new cdk.CfnParameter(this, 'paramRepo', {
-      type: 'String',
-      description: 'Name of the source GitHub repo'
-    })
-    const paramZoneDomainName = new cdk.CfnParameter(this, 'paramZoneDomainName', {
-      type: 'String',
-      description: 'Domain Name of the Zone for the website'
-    })
-    const paramRecordName = new cdk.CfnParameter(this, 'paramRecordName', {
-      type: 'String',
-      description: 'The Name that this website will be accessible at (under Hosted Zone). The full address will be https://<name>.<zone>'
+        type: 'String',
+        description: 'OAuth Token for GitHub interaction',
+        noEcho: true
     })
 
     // https://docs.aws.amazon.com/cdk/api/latest/docs/pipelines-readme.html
     const sourceArtifact = new Artifact();
     const cloudAssemblyArtifact = new Artifact();
 
-    const pipeline = new CdkPipeline(this, 'Pipeline', {
+    this.pipeline = new CdkPipeline(this, 'Pipeline', {
       pipelineName: 'PipelineOfTheseus',
       cloudAssemblyArtifact,
 
@@ -108,8 +110,8 @@ export class PipelineOfTheseus extends cdk.Stack {
         output: sourceArtifact,
         branch: 'main',
         oauthToken: new cdk.SecretValue(paramOAuthToken.valueAsString),
-        owner: paramOwner.valueAsString,
-        repo: paramRepo.valueAsString
+        owner: this.node.tryGetContext('owner'),
+        repo: this.node.tryGetContext('repo')
       }),
 
       synthAction: SimpleSynthAction.standardNpmSynth({
@@ -117,22 +119,62 @@ export class PipelineOfTheseus extends cdk.Stack {
         cloudAssemblyArtifact: cloudAssemblyArtifact,
         // Necessary in order to connect to Docker, which itself is necessary for `PythonFunction`
         environment: {privileged: true},
-        synthCommand: 'npx cdk synth ' +
-            // Yes, you do have to pass these context variable down into the next context - I checked :P
-            '-c ghUrl=https://api.github.com/repos/' + paramOwner.valueAsString + '/' + paramRepo.valueAsString + ' ' +
-            '-c domainName=' + paramZoneDomainName.valueAsString + ' ' +
-            '-c recordName=' + paramRecordName.valueAsString
+      //   synthCommand: 'npx cdk synth ' +
+      //       // Yes, you do have to pass these context variable down into the next context - I checked :P
+      //       '-c ghUrl=https://api.github.com/repos/' + props.owner + '/' + props.repo + ' ' +
+      //       '-c domainName=' + props.zoneDomainName + ' ' +
+      //       '-c recordName=' + props.recordName
       }),
       // I don't know why, but, without this, I get `Cannot retrieve value from context provider hosted-zone since
       // account/region are not specified at the stack level.` even though they're set below...
       crossAccountKeys: false
     })
+  }
+}
 
-    pipeline.addApplicationStage(new ApplicationStage(this, 'prod-stage', {
+
+// We can't just define the CfnParameters in the Pipeline Stack because then passing them down to
+// the applicationStack gives:
+// ```
+// You cannot add a dependency from 'PipelineOfTheseus/prod-stage/ApplicationStack'
+// (in Stage 'PipelineOfTheseus/prod-stage') to 'PipelineOfTheseus' (in the App):
+// dependency cannot cross stage boundaries
+// ```
+// interface PipelineOfTheseusProps extends cdk.StackProps {
+//   oauthToken: string,
+//   owner: string,
+//   repo: string,
+//   zoneDomainName: string,
+//   recordName: string
+// }
+export class PipelineOfTheseus extends cdk.Stack {
+  constructor(scope: cdk.Construct, id: string, props: cdk.StackProps) {
+    super(scope, id, props);
+
+    let recordName = this.node.tryGetContext('recordName')
+    if (recordName === undefined) {
+      throw new Error('RecordName is blank')
+    }
+    let innerPipelineStack = new InnerPipelineStack(this, 'InnerPipelineStack', {
       env: {
         account: process.env.CDK_DEFAULT_ACCOUNT,
         region: process.env.CDK_DEFAULT_REGION
       }
+      // recordName: recordName,
+      // zoneDomainName: this.node.tryGetContext('zoneDomainName'),
+      // repo: this.node.tryGetContext('repo'),
+      // oauthToken: props.oauthToken,
+      // owner: props.owner
+    })
+
+
+
+
+    innerPipelineStack.pipeline.addApplicationStage(new ApplicationStage(this, 'prod-stage', {
+      env: {
+        account: process.env.CDK_DEFAULT_ACCOUNT,
+        region: process.env.CDK_DEFAULT_REGION
+      },
     }))
 
   }

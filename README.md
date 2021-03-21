@@ -37,12 +37,10 @@ $ env CDK_NEW_BOOTSTRAP=1 npx cdk bootstrap \
     aws://111111111111/us-east-1
 ```
 This should print `Environment aws://111111111111/us-east-1 bootstrapped.`
+* Update the `owner`, `repo`, `recordName`, and `zoneDomainName` values in `cdk.json` to appropriate values
+    (for instance, for `ship.these.us`, the values would be `recordName=ship` and `zoneDomainName=these.us`)
 * One-off deploy:
 ```
 $ cdk deploy --profile <admin-profile> \
-    --parameters paramOAuthToken=<your Github OAuth token, from earlier> \
-    -c owner=<your Github username> \
-    -c repo=<your Github repo name> \
-    -c zoneDomainName=<hosted zone>
-    -c recordName=<name within hosted zone to deploy to>
+    --parameters paramOAuthToken=<your Github OAuth token, from earlier>
 ```
