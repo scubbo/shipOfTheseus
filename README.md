@@ -17,11 +17,16 @@ I have created this project that is "_on Github and all it [...] publish[es is] 
 
 ## Step-by-step
 
-* Fork this package to your own GithHub account.
+* Fork this package to your own GitHub account.
 * Check it out locally:
 ```
 $ git clone git@github.com:<yourUsername>/shipOfTheseus.git
 ```
+* Get a new OAuth token for your Github account:
+  * Go [here](https://github.com/settings/tokens), and click "Generate New Token"
+  * Sign in
+  * Give the token whatever name you want, and check "`admin:repo_hook`" and "`repo`". Click "Generate"
+  * Copy the resultant token - you can only view it once, and you'll need to paste it in below.
 * Bootstrap your AWS Account for CDK Pipeline deployments ([link](https://docs.aws.amazon.com/cdk/api/latest/docs/pipelines-readme.html#cdk-environment-bootstrapping))
     (replace `111111111111` with your accountId):
  ```
@@ -34,5 +39,8 @@ $ env CDK_NEW_BOOTSTRAP=1 npx cdk bootstrap \
 This should print `Environment aws://111111111111/us-east-1 bootstrapped.`
 * One-off deploy:
 ```
-$ cdk deploy --profile <admin-profile>
+$ cdk deploy --profile <admin-profile> \
+    --parameters paramOwner=<your Github username> \
+    --parameters paramRepo=<your Github repo name> \
+    --parameters paramOAuthToken=<your Github OAuth token, from earlier>
 ```
