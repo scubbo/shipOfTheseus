@@ -1,16 +1,17 @@
 import * as cdk from '@aws-cdk/core';
-import { DnsValidatedCertificate } from '@aws-cdk/aws-certificatemanager';
-import { Distribution } from '@aws-cdk/aws-cloudfront';
-import { S3Origin } from '@aws-cdk/aws-cloudfront-origins';
-import { GitHubSourceAction } from '@aws-cdk/aws-codepipeline-actions';
-import {CfnParameter, CustomResource, Stage} from "@aws-cdk/core";
-import { Artifact } from "@aws-cdk/aws-codepipeline";
-import { PythonFunction } from "@aws-cdk/aws-lambda-python";
-import { CdkPipeline, SimpleSynthAction } from '@aws-cdk/pipelines';
-import { ARecord, HostedZone, RecordTarget } from '@aws-cdk/aws-route53';
-import { CloudFrontTarget } from '@aws-cdk/aws-route53-targets';
-import { Bucket } from "@aws-cdk/aws-s3";
-import { BucketDeployment, Source } from "@aws-cdk/aws-s3-deployment";
+import {CfnParameter, CustomResource, Stage} from '@aws-cdk/core';
+import {DnsValidatedCertificate} from '@aws-cdk/aws-certificatemanager';
+import {Distribution} from '@aws-cdk/aws-cloudfront';
+import {S3Origin} from '@aws-cdk/aws-cloudfront-origins';
+import {GitHubSourceAction} from '@aws-cdk/aws-codepipeline-actions';
+import {Artifact} from "@aws-cdk/aws-codepipeline";
+import {PythonFunction} from "@aws-cdk/aws-lambda-python";
+import {CdkPipeline, SimpleSynthAction} from '@aws-cdk/pipelines';
+import {ARecord, HostedZone, RecordTarget} from '@aws-cdk/aws-route53';
+import {CloudFrontTarget} from '@aws-cdk/aws-route53-targets';
+import {Bucket} from "@aws-cdk/aws-s3";
+import {BucketDeployment, Source} from "@aws-cdk/aws-s3-deployment";
+import {RetentionDays} from "@aws-cdk/aws-logs";
 
 
 interface ApplicationStageProps extends cdk.StageProps {
@@ -54,10 +55,6 @@ class ApplicationStack extends cdk.Stack {
     let fullDomainName = recordName + '.' + zoneDomainName
 
     const bucket = new Bucket(this, 'WebsiteBucket');
-    new BucketDeployment(this, "Deployment", {
-      sources: [Source.asset('static-site')],
-      destinationBucket: bucket,
-    });
     // TODO: When I tried doing lookup-by-domain-name, Cloudformation created another Host Zone with the _same name_?
     // I got `fromAttributes` from [here](https://github.com/aws/aws-cdk/issues/3663)
     const zone = HostedZone.fromHostedZoneAttributes(this, 'baseZone', {
@@ -77,6 +74,11 @@ class ApplicationStack extends cdk.Stack {
       domainNames: [fullDomainName],
       certificate: certificate
     })
+    new BucketDeployment(this, "Deployment", {
+      sources: [Source.asset('static-site')],
+      destinationBucket: bucket,
+      distribution: distribution
+    });
 
     new ARecord(this, 'ARecord', {
       zone,
