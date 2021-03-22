@@ -28,7 +28,7 @@ def handler(event, context):
                 'Status': 'SUCCESS',
                 'PhysicalResourceId': event['PhysicalResourceId']
                     if 'PhysicalResourceId' in event
-                    else context['logStreamName']
+                    else context.log_stream_name
             },
             **{key: event[key] for key in
                ['StackId', 'RequestId', 'LogicalResourceId']}
@@ -44,7 +44,7 @@ def handler(event, context):
                 'Reason': f'See logs in {context["logStreamName"]}',
                 'PhysicalResourceId': event['PhysicalResourceId']
                     if 'PhysicalResourceId' in event
-                    else context['logStreamName'],
+                    else context.log_stream_name,
             },
             **{key: event.get(key, '') for key in
                ['StackId', 'RequestId', 'LogicalResourceId']}
