@@ -3,13 +3,9 @@ import os
 import requests
 
 import logging
-# https://stackoverflow.com/a/45624044/1040915
-root = logging.getLogger()
-if root.handlers:
-    for handler in root.handlers:
-        root.removeHandler(handler)
-logging.basicConfig(level=logging.DEBUG)
+# https://stackoverflow.com/questions/37703609
 log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
 def handler(event, context):
