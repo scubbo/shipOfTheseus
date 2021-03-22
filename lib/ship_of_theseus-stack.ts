@@ -34,6 +34,7 @@ class ApplicationStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: ApplicationStageProps) {
     super(scope, id, props);
 
+    // TODO: Extract this safety-checking
     let zoneId = this.node.tryGetContext('zoneId');
     if (zoneId === undefined) {
       throw new Error("ZoneId is undefined");
@@ -46,6 +47,8 @@ class ApplicationStack extends cdk.Stack {
     if (recordName === undefined) {
       throw new Error('RecordName is undefined')
     }
+    let ghCommitsUrl = 'https://api.github.com/repos/' + this.node.tryGetContext('owner') +
+        '/' + this.node.tryGetContext('repo')
     // I would have loved to do this as `domainNames: [aRecord.domainName]`, but
     // boo hoo that would cause a circular dependency wah wah.
     let fullDomainName = recordName + '.' + zoneDomainName
@@ -85,7 +88,7 @@ class ApplicationStack extends cdk.Stack {
       entry: 'lambda/',
       environment: {
         bucketArn: bucket.bucketArn,
-        githubCommitsUrl: this.node.tryGetContext('ghUrl')
+        githubCommitsUrl: ghCommitsUrl
       }
     });
     bucket.grantPut(lambda);
