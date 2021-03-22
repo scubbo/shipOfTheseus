@@ -22,13 +22,13 @@ def handler(event, context):
             log.info('Non-create/update RequestType')
         requests.put(event['ResponseURL'], data=dict(
             {'Status': 'SUCCESS'},
-            **{key: event[key] for key in
+            **{key: event.get(key, '') for key in
                ['PhysicalResourceId', 'StackId', 'RequestId', 'LogicalResourceId']}
         ))
     except Exception as e:
         log.error(f'Lambda failed! {e}')
         requests.put(event['ResponseURL'], data=dict(
             {'Status': 'FAILED'},
-            **{key: event[key] for key in
+            **{key: event.get(key, '') for key in
                ['PhysicalResourceId', 'StackId', 'RequestId', 'LogicalResourceId']}
         ))
