@@ -91,7 +91,8 @@ class ApplicationStack extends cdk.Stack {
       environment: {
         bucketArn: bucket.bucketArn,
         githubCommitsUrl: ghCommitsUrl
-      }
+      },
+      logRetention: RetentionDays.ONE_WEEK
     });
     bucket.grantPut(lambda);
     new CustomResource(this, 'FetchCommitsCustomResource', {
