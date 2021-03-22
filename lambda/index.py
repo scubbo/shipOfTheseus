@@ -21,19 +21,33 @@ def handler(event, context):
             # TODO - write the data to `commits.json` in the S3 bucket.
         else:
             log.info('Non-create/update RequestType')
+
+        # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/crpg-ref-responses.html
         responseData = dict(
-            {'Status': 'SUCCESS'},
-            **{key: event.get(key, '') for key in
-               ['PhysicalResourceId', 'StackId', 'RequestId', 'LogicalResourceId']}
+            {
+                'Status': 'SUCCESS',
+                'PhysicalResourceId': event['PhysicalResourceId']
+                    if 'PhysicalResourceId' in event
+                    else context['logStreamName']
+            },
+            **{key: event[key] for key in
+               ['StackId', 'RequestId', 'LogicalResourceId']}
         )
         log.debug(f'Response data: {responseData}')
         requests.put(event['ResponseURL'], data=responseData)
     except Exception as e:
         log.error(f'Lambda failed! {e}')
+        # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/crpg-ref-responses.html
         responseData = dict(
-            {'Status': 'FAILED'},
+            {
+                'Status': 'FAILED',
+                'Reason': f'See logs in {context["logStreamName"]}',
+                'PhysicalResourceId': event['PhysicalResourceId']
+                    if 'PhysicalResourceId' in event
+                    else context['logStreamName'],
+            },
             **{key: event.get(key, '') for key in
-               ['PhysicalResourceId', 'StackId', 'RequestId', 'LogicalResourceId']}
+               ['StackId', 'RequestId', 'LogicalResourceId']}
         )
         log.debug(f'Response data: {responseData}')
         requests.put(event['ResponseURL'], data=responseData)
