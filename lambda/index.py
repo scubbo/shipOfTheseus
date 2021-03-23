@@ -39,12 +39,12 @@ def handler(event, context):
         log.debug(f'Response data: {responseData}')
         requests.put(event['ResponseURL'], data=responseData, headers={'Content-Type': ''})
     except Exception as e:
-        log.error(f'Lambda failed! {e}')
+        log.exception(f'Lambda failed! {e}')
         # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/crpg-ref-responses.html
         responseData = dict(
             {
                 'Status': 'FAILED',
-                'Reason': f'See logs in {context["logStreamName"]}',
+                'Reason': f'See logs in {context.log_stream_name}',
                 'PhysicalResourceId': event['PhysicalResourceId']
                     if 'PhysicalResourceId' in event
                     else context.log_stream_name,
@@ -59,7 +59,7 @@ def handler(event, context):
 def _fetch_commit_history(ghUrl):
     commit = _get_commit_info(ghUrl)
     commits = [commit]
-    while commit['parents']:
+    while commit.get('parents', []):
         commit = _get_commit_info(commit['parent_url'])
         commits.append(commit)
     return commits
@@ -70,8 +70,11 @@ def _get_commit_info(commit_url):
     one parent), because Real Programmers use ~~butterflies~~ rebases. Fite me IRL, Git-nerds.
     """
     commit = requests.get(commit_url).json()
+    log.debug(f'Operating on {commit}')
     return {
         'sha': commit['sha'],
         'message': commit['commit']['message'],
+        # We can safely do `['parents']`, here, because the `while` loop above enforces that
+        # the value is present.
         'parent_url': commit['parents'][0]['url']
     }

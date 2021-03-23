@@ -49,7 +49,7 @@ class ApplicationStack extends cdk.Stack {
       throw new Error('RecordName is undefined')
     }
     let ghCommitsUrl = 'https://api.github.com/repos/' + this.node.tryGetContext('owner') +
-        '/' + this.node.tryGetContext('repo')
+        '/' + this.node.tryGetContext('repo') + '/commits/HEAD'
     // I would have loved to do this as `domainNames: [aRecord.domainName]`, but
     // boo hoo that would cause a circular dependency wah wah.
     let fullDomainName = recordName + '.' + zoneDomainName
