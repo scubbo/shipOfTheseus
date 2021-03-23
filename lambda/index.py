@@ -18,8 +18,8 @@ def handler(event, context):
             bucket_name = os.environ['bucketArn'].split(':')[-1]
             object = s3.Object(bucket_name, 'commits.json')
             # TODO - do we need public ACL, or expiry?
-            object.put(Body=json.dumps(commit_data).encode('utf-8'))
-            log.info('Successfully uploaded commit data to `commits.json`')
+            log.info('Uploading to S3...')
+            log.info(object.put(Body=json.dumps(commit_data).encode('utf-8')))
             # TODO - pass in the commit that the pipeline's working on, and restrict this
             # to only "commits prior to that", just in case there are two commits in quick succession
         else:
