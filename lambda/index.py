@@ -7,6 +7,8 @@ import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
+import boto3
+
 
 def handler(event, context):
     try:
