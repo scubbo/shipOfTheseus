@@ -96,7 +96,11 @@ class ApplicationStack extends cdk.Stack {
     });
     bucket.grantPut(lambda);
     new CustomResource(this, 'FetchCommitsCustomResource', {
-      serviceToken: lambda.functionArn
+      serviceToken: lambda.functionArn,
+      properties: {
+        // Without this, the CustomResource wouldn't have any "updates", and so wouldn't get called on re-deploys
+        timestamp: Date.now().toString()
+      }
     });
 
   }
