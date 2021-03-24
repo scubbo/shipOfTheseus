@@ -97,6 +97,9 @@ class ApplicationStack extends cdk.Stack {
       },
       logRetention: RetentionDays.ONE_WEEK
     });
+    // I expected that `grantPut` should be sufficient here - but, with that, the boto call completes without any
+    // error, but the file doesn't show up. Curious.
+    // TODO - check if `grantWrite` is sufficient.
     bucket.grantReadWrite(lambda);
     new CustomResource(this, 'FetchCommitsCustomResource', {
       serviceToken: lambda.functionArn,
