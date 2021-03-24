@@ -99,7 +99,7 @@ class ApplicationStack extends cdk.Stack {
       timeout: Duration.minutes(1)
     });
     // I expected that `grantPut` should be sufficient here - but, with that, the boto call completes without any
-    // error, but the file doesn't show up. Curious.
+    // error, but the file doesn't show up. Curious
     // TODO - check if `grantWrite` is sufficient.
     bucket.grantReadWrite(lambda);
     new CustomResource(this, 'FetchCommitsCustomResource', {
