@@ -94,7 +94,7 @@ class ApplicationStack extends cdk.Stack {
       },
       logRetention: RetentionDays.ONE_WEEK
     });
-    bucket.grantPut(lambda);
+    bucket.grantReadWrite(lambda);
     new CustomResource(this, 'FetchCommitsCustomResource', {
       serviceToken: lambda.functionArn,
       properties: {
