@@ -75,8 +75,7 @@ def _get_commit_info(commit_url):
     commit = requests.get(commit_url).json()
     log.debug(f'Operating on {commit}')
     parents = commit.get('parents', [])
-    if parents:
-        parent_url = parents[0]['url']
+    parent_url = parents[0]['url'] if parents else None
     return {
         'sha': commit['sha'],
         'message': commit['commit']['message'],
