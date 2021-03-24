@@ -61,10 +61,11 @@ def handler(event, context):
 def _fetch_commit_history(ghUrl):
     commit = _get_commit_info(ghUrl)
     commits = [commit]
-    while commit.get('parents', []):
+    while commit['parent_url']:
         commit = _get_commit_info(commit['parent_url'])
         commits.append(commit)
     return commits
+
 
 def _get_commit_info(commit_url):
     """
@@ -76,7 +77,5 @@ def _get_commit_info(commit_url):
     return {
         'sha': commit['sha'],
         'message': commit['commit']['message'],
-        # We can safely do `['parents']`, here, because the `while` loop above enforces that
-        # the value is present.
-        'parent_url': commit['parents'][0]['url']
+        'parent_url': commit.get('parents', [{'url': None}])[0]['url']
     }
