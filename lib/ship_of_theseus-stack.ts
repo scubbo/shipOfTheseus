@@ -1,7 +1,7 @@
 import * as cdk from '@aws-cdk/core';
 import {CfnParameter, CustomResource, Stage} from '@aws-cdk/core';
 import {DnsValidatedCertificate} from '@aws-cdk/aws-certificatemanager';
-import {Distribution} from '@aws-cdk/aws-cloudfront';
+import {Distribution, ViewerProtocolPolicy} from '@aws-cdk/aws-cloudfront';
 import {S3Origin} from '@aws-cdk/aws-cloudfront-origins';
 import {GitHubSourceAction} from '@aws-cdk/aws-codepipeline-actions';
 import {Artifact} from "@aws-cdk/aws-codepipeline";
@@ -69,10 +69,13 @@ class ApplicationStack extends cdk.Stack {
     // to ensure it's updated faster (which is honestly pointless from a practical
     // perspective - but it's the principle of the thing)
     let distribution = new Distribution(this, 'Distribution', {
-      defaultBehavior: { origin: new S3Origin(bucket)},
+      defaultBehavior: {
+        origin: new S3Origin(bucket),
+        viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS
+      },
       defaultRootObject: 'index.html',
       domainNames: [fullDomainName],
-      certificate: certificate
+      certificate: certificate,
     })
     new BucketDeployment(this, "Deployment", {
       sources: [Source.asset('static-site')],
