@@ -39,7 +39,7 @@ def handler(event, context):
                ['StackId', 'RequestId', 'LogicalResourceId']}
         )
         log.debug(f'Response data: {responseData}')
-        requests.put(event['ResponseURL'], data=responseData, headers={'Content-Type': ''})
+        requests.put(event['ResponseURL'], data=json.dumps(responseData))
     except Exception as e:
         log.exception(f'Lambda failed! {e}')
         # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/crpg-ref-responses.html
@@ -55,7 +55,7 @@ def handler(event, context):
                ['StackId', 'RequestId', 'LogicalResourceId']}
         )
         log.debug(f'Response data: {responseData}')
-        requests.put(event['ResponseURL'], data=responseData, headers={'Content-Type': ''})
+        requests.put(event['ResponseURL'], data=json.dumps(responseData))
 
 
 def _fetch_commit_history(ghUrl):
