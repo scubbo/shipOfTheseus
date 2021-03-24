@@ -1,5 +1,5 @@
 import * as cdk from '@aws-cdk/core';
-import {CfnParameter, CustomResource, Stage} from '@aws-cdk/core';
+import {CfnParameter, CustomResource, Duration, Stage} from '@aws-cdk/core';
 import {DnsValidatedCertificate} from '@aws-cdk/aws-certificatemanager';
 import {Distribution, ViewerProtocolPolicy} from '@aws-cdk/aws-cloudfront';
 import {S3Origin} from '@aws-cdk/aws-cloudfront-origins';
@@ -95,7 +95,8 @@ class ApplicationStack extends cdk.Stack {
         bucketArn: bucket.bucketArn,
         githubCommitsUrl: ghCommitsUrl
       },
-      logRetention: RetentionDays.ONE_WEEK
+      logRetention: RetentionDays.ONE_WEEK,
+      timeout: Duration.minutes(1)
     });
     // I expected that `grantPut` should be sufficient here - but, with that, the boto call completes without any
     // error, but the file doesn't show up. Curious.
