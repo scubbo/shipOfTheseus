@@ -22,6 +22,7 @@ def handler(event, context):
             # TODO - do we need public ACL, or expiry?
             log.info('Uploading to S3...')
             log.info(object.put(Body=json.dumps(commit_data).encode('utf-8')))
+            log.debug(f'Just uploaded a commits.json whose most-recent commit is {commit_data[0]}')
             # TODO - pass in the commit that the pipeline's working on, and restrict this
             # to only "commits prior to that", just in case there are two commits in quick succession
         else:
