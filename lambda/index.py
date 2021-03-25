@@ -26,7 +26,7 @@ def handler(event, context):
             # TODO - if we wanted to be really fancy here, we could only invalidate if the content
             # of the file is different (but that would be _super_-overkill for this silly little
             # project!)
-            log.info(boto3.resource('cloudfront').create_invalidation(
+            log.info(boto3.client('cloudfront').create_invalidation(
                 DistributionId=os.environ['distributionId'],
                 InvalidationBatch={
                     'Paths': {
