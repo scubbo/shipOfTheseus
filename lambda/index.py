@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import requests
@@ -19,10 +20,25 @@ def handler(event, context):
             s3 = boto3.resource('s3')
             bucket_name = os.environ['bucketArn'].split(':')[-1]
             object = s3.Object(bucket_name, 'commits.json')
-            # TODO - do we need public ACL, or expiry?
             log.info('Uploading to S3...')
             log.info(object.put(Body=json.dumps(commit_data).encode('utf-8')))
             log.debug(f'Just uploaded a commits.json whose most-recent commit is {commit_data[0]}')
+            # TODO - if we wanted to be really fancy here, we could only invalidate if the content
+            # of the file is different (but that would be _super_-overkill for this silly little
+            # project!)
+            log.info(boto3.resource('cloudfront').create_invalidation(
+                DistributionId=os.environ['distributionId'],
+                InvalidationBatch={
+                    'Paths': {
+                        'Quantity': 1,
+                        'Items': [
+                            '/commits.json'
+                        ],
+                    },
+                    'CallerReference': str(datetime.datetime.now())
+                }
+            ))
+            log.debug('And just invalidated it in Cloudfront')
             # TODO - pass in the commit that the pipeline's working on, and restrict this
             # to only "commits prior to that", just in case there are two commits in quick succession
         else:

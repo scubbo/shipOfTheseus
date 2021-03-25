@@ -5,6 +5,7 @@ import {Distribution, ViewerProtocolPolicy} from '@aws-cdk/aws-cloudfront';
 import {S3Origin} from '@aws-cdk/aws-cloudfront-origins';
 import {GitHubSourceAction} from '@aws-cdk/aws-codepipeline-actions';
 import {Artifact} from "@aws-cdk/aws-codepipeline";
+import {Effect, PolicyStatement} from "@aws-cdk/aws-iam";
 import {PythonFunction} from "@aws-cdk/aws-lambda-python";
 import {CdkPipeline, SimpleSynthAction} from '@aws-cdk/pipelines';
 import {ARecord, HostedZone, RecordTarget} from '@aws-cdk/aws-route53';
@@ -65,9 +66,6 @@ class ApplicationStack extends cdk.Stack {
       domainName: fullDomainName,
       hostedZone: zone,
     });
-    // TODO: update Cache configuration so `commits.json` has lower cache rate
-    // to ensure it's updated faster (which is honestly pointless from a practical
-    // perspective - but it's the principle of the thing)
     let distribution = new Distribution(this, 'Distribution', {
       defaultBehavior: {
         origin: new S3Origin(bucket),
@@ -93,6 +91,7 @@ class ApplicationStack extends cdk.Stack {
       entry: 'lambda/',
       environment: {
         bucketArn: bucket.bucketArn,
+        distributionId: distribution.distributionId,
         githubCommitsUrl: ghCommitsUrl
       },
       logRetention: RetentionDays.ONE_WEEK,
@@ -102,6 +101,11 @@ class ApplicationStack extends cdk.Stack {
     // error, but the file doesn't show up. Curious
     // TODO - check if `grantWrite` is sufficient.
     bucket.grantReadWrite(lambda);
+    lambda.role?.addToPolicy(new PolicyStatement({
+      actions: ['cloudfront:CreateInvalidation'],
+      effect: Effect.ALLOW,
+      resources: ['*']
+    }))
     new CustomResource(this, 'FetchCommitsCustomResource', {
       serviceToken: lambda.functionArn,
       properties: {
