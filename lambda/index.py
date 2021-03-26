@@ -91,10 +91,18 @@ def _get_commit_info(commit_url):
     """
     commit = requests.get(commit_url).json()
     log.debug(f'Operating on {commit}')
+
+    message_split = commit['commit']['message'].split('\n')
+    title = message_split[0]
+    # No need for length-checking because Python gracefully handles slices beyond actual length :)
+    body = '\n'.join(message_split[1:]).strip()
+
     parents = commit.get('parents', [])
     parent_url = parents[0]['url'] if parents else None
+
     return {
         'sha': commit['sha'],
-        'message': commit['commit']['message'],
+        'title': title,
+        'body': body,
         'parent_url': parent_url  # Intentionally `None` for the root commit
     }
