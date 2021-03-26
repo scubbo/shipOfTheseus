@@ -15,25 +15,20 @@ import {BucketDeployment, Source} from "@aws-cdk/aws-s3-deployment";
 import {RetentionDays} from "@aws-cdk/aws-logs";
 
 
-interface ApplicationStageProps extends cdk.StageProps {
-  // recordName: string,
-  // zoneDomainName: string
-}
 class ApplicationStage extends Stage {
 
-  constructor(scope: cdk.Construct, id: string, props: ApplicationStageProps) {
+  constructor(scope: cdk.Construct, id: string, props: cdk.StageProps) {
     super(scope, id, props);
 
-    // Immediately delegate to a stack because it's an error to create Buckets (and
-    // probably other resources) directly in a Stage.
+    // Immediately delegate to a stack, because it's an error to create Buckets
+    // (and probably other resources) directly in a Stage.
     new ApplicationStack(this, 'ApplicationStack', props);
 
   }
 }
 
-interface ApplicationStackProps extends ApplicationStageProps {}
 class ApplicationStack extends cdk.Stack {
-  constructor(scope: cdk.Construct, id: string, props: ApplicationStageProps) {
+  constructor(scope: cdk.Construct, id: string, props: cdk.StageProps) {
     super(scope, id, props);
 
     // TODO: Extract this safety-checking
@@ -56,7 +51,7 @@ class ApplicationStack extends cdk.Stack {
     let fullDomainName = recordName + '.' + zoneDomainName
 
     const bucket = new Bucket(this, 'WebsiteBucket');
-    // TODO: When I tried doing lookup-by-domain-name, Cloudformation created another Host Zone with the _same name_?
+    // When I tried doing lookup-by-domain-name, Cloudformation created another Host Zone with the _same name_?
     // I got `fromAttributes` from [here](https://github.com/aws/aws-cdk/issues/3663)
     const zone = HostedZone.fromHostedZoneAttributes(this, 'baseZone', {
       zoneName: zoneDomainName,
@@ -100,7 +95,7 @@ class ApplicationStack extends cdk.Stack {
     // I expected that `grantPut` should be sufficient here - but, with that, the boto call completes without any
     // error, but the file doesn't show up. Curious
     // TODO - check if `grantWrite` is sufficient.
-    bucket.grantReadWrite(lambda);
+    bucket.grantWrite(lambda);
     lambda.role?.addToPolicy(new PolicyStatement({
       actions: ['cloudfront:CreateInvalidation'],
       effect: Effect.ALLOW,
@@ -119,10 +114,6 @@ class ApplicationStack extends cdk.Stack {
 
 interface InnerPipelineStackProps extends cdk.StackProps {
   paramOAuthToken: CfnParameter,
-  // owner: string,
-  // repo: string,
-  // zoneDomainName: string,
-  // recordName: string
 }
 // Inner Stack to allow Parameters to be used in the pipeline and in the ApplicationStack
 // without causing dependency issues
@@ -133,7 +124,10 @@ class InnerPipelineStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: InnerPipelineStackProps) {
     super(scope, id, props);
 
-    // We don't actually use this param, but when doing `cdk deploy --parameters <...> --all`, all stacks need to be able to accept all parameters - and we can't just deploy once at once. So all Stacks need to have the same named param
+    // We don't actually use this param, but when doing `cdk deploy --parameters <...> --all`,
+    // all stacks need to be able to accept all parameters - and we can't just deploy once at once.
+    // So all Stacks need to have the same named param.
+    // If you know a better way, _please_ reach out and tell me!
     new CfnParameter(this, 'paramOAuthToken', {
       description: 'Fake param. See comment.',
       noEcho: true
@@ -161,11 +155,6 @@ class InnerPipelineStack extends cdk.Stack {
         cloudAssemblyArtifact: cloudAssemblyArtifact,
         // Necessary in order to connect to Docker, which itself is necessary for `PythonFunction`
         environment: {privileged: true},
-      //   synthCommand: 'npx cdk synth ' +
-      //       // Yes, you do have to pass these context variable down into the next context - I checked :P
-      //       '-c ghUrl=https://api.github.com/repos/' + props.owner + '/' + props.repo + ' ' +
-      //       '-c domainName=' + props.zoneDomainName + ' ' +
-      //       '-c recordName=' + props.recordName
       }),
       // I don't know why, but, without this, I get `Cannot retrieve value from context provider hosted-zone since
       // account/region are not specified at the stack level.` even though they're set below...
@@ -182,13 +171,6 @@ class InnerPipelineStack extends cdk.Stack {
 // (in Stage 'PipelineOfTheseus/prod-stage') to 'PipelineOfTheseus' (in the App):
 // dependency cannot cross stage boundaries
 // ```
-// interface PipelineOfTheseusProps extends cdk.StackProps {
-//   oauthToken: string,
-//   owner: string,
-//   repo: string,
-//   zoneDomainName: string,
-//   recordName: string
-// }
 export class PipelineOfTheseus extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: cdk.StackProps) {
     super(scope, id, props);
@@ -205,15 +187,7 @@ export class PipelineOfTheseus extends cdk.Stack {
         region: process.env.CDK_DEFAULT_REGION
       },
       paramOAuthToken: paramOAuthToken
-      // recordName: recordName,
-      // zoneDomainName: this.node.tryGetContext('zoneDomainName'),
-      // repo: this.node.tryGetContext('repo'),
-      // oauthToken: props.oauthToken,
-      // owner: props.owner
     })
-
-
-
 
     innerPipelineStack.pipeline.addApplicationStage(new ApplicationStage(this, 'prod-stage', {
       env: {
