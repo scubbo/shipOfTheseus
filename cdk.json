@@ -13,6 +13,9 @@
     "repo": "shipOfTheseus",
     "recordName": "selfsite",
     "zoneDomainName": "scubbo.org",
-    "zoneId": "ZO3B2N6W70PDC"
+    "zoneId": "ZO3B2N6W70PDC",
+    "dockerUsername": "scubbo",
+    "oAuthTokenSecretArn": "arn:aws:secretsmanager:us-east-1:119281758091:secret:shipOfTheseusOAuthToken-d3PuX1",
+    "dockerPasswordSecretArn": "arn:aws:secretsmanager:us-east-1:119281758091:secret:shipOfTheseusDockerPassword-iQ95r5"
   }
 }

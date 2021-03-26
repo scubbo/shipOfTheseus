@@ -1,5 +1,5 @@
 import * as cdk from '@aws-cdk/core';
-import {CfnParameter, CustomResource, Duration, Stage} from '@aws-cdk/core';
+import {CustomResource, Duration, Stage} from '@aws-cdk/core';
 import {DnsValidatedCertificate} from '@aws-cdk/aws-certificatemanager';
 import {Distribution, ViewerProtocolPolicy} from '@aws-cdk/aws-cloudfront';
 import {S3Origin} from '@aws-cdk/aws-cloudfront-origins';
@@ -13,6 +13,8 @@ import {CloudFrontTarget} from '@aws-cdk/aws-route53-targets';
 import {Bucket} from "@aws-cdk/aws-s3";
 import {BucketDeployment, Source} from "@aws-cdk/aws-s3-deployment";
 import {RetentionDays} from "@aws-cdk/aws-logs";
+import {BuildEnvironmentVariableType} from "@aws-cdk/aws-codebuild";
+import {Secret} from "@aws-cdk/aws-secretsmanager";
 
 
 class ApplicationStage extends Stage {
@@ -94,7 +96,6 @@ class ApplicationStack extends cdk.Stack {
     });
     // I expected that `grantPut` should be sufficient here - but, with that, the boto call completes without any
     // error, but the file doesn't show up. Curious
-    // TODO - check if `grantWrite` is sufficient.
     bucket.grantWrite(lambda);
     lambda.role?.addToPolicy(new PolicyStatement({
       actions: ['cloudfront:CreateInvalidation'],
@@ -112,30 +113,27 @@ class ApplicationStack extends cdk.Stack {
   }
 }
 
-interface InnerPipelineStackProps extends cdk.StackProps {
-  paramOAuthToken: CfnParameter,
-}
 // Inner Stack to allow Parameters to be used in the pipeline and in the ApplicationStack
 // without causing dependency issues
 class InnerPipelineStack extends cdk.Stack {
 
   readonly pipeline: CdkPipeline
 
-  constructor(scope: cdk.Construct, id: string, props: InnerPipelineStackProps) {
+  constructor(scope: cdk.Construct, id: string, props: cdk.StageProps) {
     super(scope, id, props);
-
-    // We don't actually use this param, but when doing `cdk deploy --parameters <...> --all`,
-    // all stacks need to be able to accept all parameters - and we can't just deploy once at once.
-    // So all Stacks need to have the same named param.
-    // If you know a better way, _please_ reach out and tell me!
-    new CfnParameter(this, 'paramOAuthToken', {
-      description: 'Fake param. See comment.',
-      noEcho: true
-    })
 
     // https://docs.aws.amazon.com/cdk/api/latest/docs/pipelines-readme.html
     const sourceArtifact = new Artifact();
     const cloudAssemblyArtifact = new Artifact();
+
+    let dockerPasswordSecretArn = this.node.tryGetContext('dockerPasswordSecretArn');
+    if (dockerPasswordSecretArn === undefined) {
+      throw new Error("dockerPasswordSecretArn is undefined");
+    }
+    let dockerPasswordSecretName = Secret.fromSecretCompleteArn(
+        this, 'dockerPasswordSecret', dockerPasswordSecretArn
+    ).secretName;
+
 
     this.pipeline = new CdkPipeline(this, 'Pipeline', {
       pipelineName: 'PipelineOfTheseus',
@@ -145,7 +143,7 @@ class InnerPipelineStack extends cdk.Stack {
         actionName: 'GitHub',
         output: sourceArtifact,
         branch: 'main',
-        oauthToken: new cdk.SecretValue(props.paramOAuthToken.valueAsString),
+        oauthToken: cdk.SecretValue.secretsManager(this.node.tryGetContext("oAuthTokenSecretArn")),
         owner: this.node.tryGetContext('owner'),
         repo: this.node.tryGetContext('repo')
       }),
@@ -153,8 +151,38 @@ class InnerPipelineStack extends cdk.Stack {
       synthAction: SimpleSynthAction.standardNpmSynth({
         sourceArtifact: sourceArtifact,
         cloudAssemblyArtifact: cloudAssemblyArtifact,
-        // Necessary in order to connect to Docker, which itself is necessary for `PythonFunction`
-        environment: {privileged: true},
+        environment: {
+          environmentVariables: {
+            'dockerUsername': {
+              type: BuildEnvironmentVariableType.PLAINTEXT,
+              value: this.node.tryGetContext("dockerUsername")
+            },
+            'dockerPassword': {
+              type: BuildEnvironmentVariableType.SECRETS_MANAGER,
+              value: dockerPasswordSecretName
+            }
+          },
+          // Necessary in order to connect to Docker, which itself is necessary for `PythonFunction`
+          privileged: true,
+        },
+        // `npm ci` is the default - we also log in to Docker because of
+        // https://www.docker.com/increase-rate-limits and https://bit.ly/3sEcPC4
+        installCommand: 'npm ci && echo "Logging in to Docker..." && echo "DEBUG: $dockerUsername" && echo "DEBUG: $dockerPassword" |  tr "[:lower:]" "[:upper:]" && echo $dockerPassword | docker login -u $dockerUsername --password-stdin',
+        rolePolicyStatements: [
+            new PolicyStatement({
+              effect: Effect.ALLOW,
+              // These actions are more than I expected, but experimenting with IAM is a real arse, so I'm just copying
+              // https://github.com/aws/aws-cdk/issues/8752#issuecomment-698276397
+              actions: [
+                'secretsmanager:GetRandomPassword',
+                'secretsmanager:GetResourcePolicy',
+                'secretsmanager:GetSecretValue',
+                'secretsmanager:DescribeSecret',
+                'secretsmanager:ListSecretVersionIds',
+              ],
+              resources: [dockerPasswordSecretArn]
+            })
+        ]
       }),
       // I don't know why, but, without this, I get `Cannot retrieve value from context provider hosted-zone since
       // account/region are not specified at the stack level.` even though they're set below...
@@ -164,36 +192,21 @@ class InnerPipelineStack extends cdk.Stack {
 }
 
 
-// We can't just define the CfnParameters in the Pipeline Stack because then passing them down to
-// the applicationStack gives:
-// ```
-// You cannot add a dependency from 'PipelineOfTheseus/prod-stage/ApplicationStack'
-// (in Stage 'PipelineOfTheseus/prod-stage') to 'PipelineOfTheseus' (in the App):
-// dependency cannot cross stage boundaries
-// ```
 export class PipelineOfTheseus extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: cdk.StackProps) {
     super(scope, id, props);
 
-    const paramOAuthToken = new cdk.CfnParameter(this, 'paramOAuthToken', {
-      type: 'String',
-      description: 'OAuth Token for GitHub interaction',
-      noEcho: true
-    })
+    const env = {
+      account: process.env.CDK_DEFAULT_ACCOUNT,
+      region: process.env.CDK_DEFAULT_REGION
+    }
 
     let innerPipelineStack = new InnerPipelineStack(this, 'InnerPipelineStack', {
-      env: {
-        account: process.env.CDK_DEFAULT_ACCOUNT,
-        region: process.env.CDK_DEFAULT_REGION
-      },
-      paramOAuthToken: paramOAuthToken
+      env: env
     })
 
     innerPipelineStack.pipeline.addApplicationStage(new ApplicationStage(this, 'prod-stage', {
-      env: {
-        account: process.env.CDK_DEFAULT_ACCOUNT,
-        region: process.env.CDK_DEFAULT_REGION
-      },
+      env: env,
     }))
 
   }

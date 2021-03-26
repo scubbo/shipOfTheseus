@@ -14,6 +14,10 @@ I have created this project that is "_on Github and all it [...] publish[es is] 
   * You must have local [AWS credentials](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) 
       that have admin privileges on that account. 
 * You must have your own GitHub account.
+* You are encouraged to have your own Docker account, otherwise you will
+    [be counted as an anonymous user](https://www.docker.com/increase-rate-limits), which severely
+    limits your ability to do Docker pulls (I suspect that "all CodeBuild requests" are in the same rate-limiting
+    bucket, because I definitely got limited earlier than 100 builds in 6 hours...)
 
 ## Step-by-step
 
@@ -37,11 +41,16 @@ $ env CDK_NEW_BOOTSTRAP=1 npx cdk bootstrap \
     aws://111111111111/us-east-1
 ```
 This should print `Environment aws://111111111111/us-east-1 bootstrapped.`
-* Update the `owner`, `repo`, `recordName`, and `zoneDomainName` values in `cdk.json` to appropriate values
+* Create [SecretsManager](https://aws.amazon.com/secrets-manager/) Secrets for your OAuth Token
+    and your docker Password:
+```
+$ ./create-secrets.sh -p <admin-profile> -o <OAuthToken> -d <DockerPassword>
+```
+This will print two ARNs - you will use them in the next step!
+* Update the `owner`, `repo`, `recordName`, `zoneDomainName`, `dockerUsername`, `oAuthTokenSecretArn`, and
+    `dockerPasswordSecretArn` values in `cdk.json` to appropriate values
     (for instance, for `ship.these.us`, the values would be `recordName=ship` and `zoneDomainName=these.us`)
 * One-off deploy:
 ```
-$ cdk deploy --profile <admin-profile> \
-    --parameters paramOAuthToken=<your Github OAuth token, from earlier> \
-    PipelineOfTheseus
+$ cdk deploy --profile <admin-profile> --all
 ```
