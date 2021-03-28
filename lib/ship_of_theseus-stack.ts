@@ -1,5 +1,5 @@
 import * as cdk from '@aws-cdk/core';
-import {CustomResource, Duration, Stage} from '@aws-cdk/core';
+import {CustomResource, Duration, RemovalPolicy, Stage} from '@aws-cdk/core';
 import {DnsValidatedCertificate} from '@aws-cdk/aws-certificatemanager';
 import {Distribution, ViewerProtocolPolicy} from '@aws-cdk/aws-cloudfront';
 import {S3Origin} from '@aws-cdk/aws-cloudfront-origins';
@@ -52,7 +52,10 @@ class ApplicationStack extends cdk.Stack {
     // boo hoo that would cause a circular dependency wah wah.
     let fullDomainName = recordName + '.' + zoneDomainName
 
-    const bucket = new Bucket(this, 'WebsiteBucket');
+    const bucket = new Bucket(this, 'WebsiteBucket', {
+      autoDeleteObjects: true,
+      removalPolicy: RemovalPolicy.DESTROY
+    });
     // When I tried doing lookup-by-domain-name, Cloudformation created another Host Zone with the _same name_?
     // I got `fromAttributes` from [here](https://github.com/aws/aws-cdk/issues/3663)
     const zone = HostedZone.fromHostedZoneAttributes(this, 'baseZone', {
