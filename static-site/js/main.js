@@ -5,7 +5,8 @@ $(document).ready(function() {
             $('#commits-list').append(
                 '<li>' +
                   // 50 from https://chris.beams.io/posts/git-commit/
-                  commit['sha'].slice(0, 6) + '\t' + commit['title'].slice(0, 50) +
+                  '<code>' + commit['sha'].slice(0, 6) + '</code>\t' +
+                  '<a href="' + commit['url'] + '">' + commit['title'].slice(0, 50) + '</a>' +
                 '</li>'
             );
         });

@@ -104,5 +104,6 @@ def _get_commit_info(commit_url):
         'sha': commit['sha'],
         'title': title,
         'body': body,
+        'url': commit['html_url'],
         'parent_url': parent_url  # Intentionally `None` for the root commit
     }
